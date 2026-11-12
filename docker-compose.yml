@@ -24,6 +24,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@db:5432/knowledge_hub
       JWT_EXPIRE_MINUTES: 30
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
