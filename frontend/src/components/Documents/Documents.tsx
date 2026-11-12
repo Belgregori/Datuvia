@@ -147,7 +147,7 @@ export default function Documents({ selectedWorkspace }: DocumentsProps) {
           <input
             id="doc-file-input"
             type="file"
-            accept=".txt,.md,.csv,.json"
+            accept=".pdf,.txt,.md,.csv,.json"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             required
             style={{ flex: 1 }}
@@ -156,7 +156,7 @@ export default function Documents({ selectedWorkspace }: DocumentsProps) {
             {uploading ? 'Procesando...' : 'Subir archivo'}
           </button>
         </div>
-        <small style={{ color: '#888' }}>Formatos permitidos: .txt, .md, .csv, .json (máx. 2 MB)</small>
+        <small style={{ color: '#888' }}>Formatos permitidos: .pdf, .txt, .md, .csv, .json (máx. 2 MB)</small>
         {error && <small style={{ color: '#ff6b6b' }}>{error}</small>}
       </form>
 
