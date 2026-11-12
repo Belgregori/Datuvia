@@ -19,7 +19,13 @@ def get_session():
         yield session
 
 def init_db():
-    # Inicialización de la base de datos si es necesaria
-    pass        
+    from sqlalchemy import text
+
+    from app.db.database import Base, engine
+    import app.db.models  # noqa: F401
+
+    with engine.begin() as connection:
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    Base.metadata.create_all(bind=engine)        
 
   

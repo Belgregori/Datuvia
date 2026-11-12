@@ -1,13 +1,18 @@
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
+import Dashboard from './components/Dashboard/Dashboard';
 
-function App() {
+export default function App() {
+  const token = localStorage.getItem('token');
+
+  if (token) {
+    return <Dashboard />;
+  }
+
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: '50px', marginTop: '50px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', marginTop: '50px' }}>
       <Login />
       <Register />
     </div>
   );
 }
-
-export default App;

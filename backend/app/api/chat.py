@@ -1,24 +1,27 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from app.core.security import get_current_user
-from app.db.models import User
+from app.db.models import User, Workspace
 from app.db.session import get_session
-from app.services.retrieval import answer_from_chunks, search_chunks
+from app.services.rag_service import generate_answer
+from app.services.retrieval import search_chunks
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)
-    top_k: int = Field(default=4, ge=1, le=10)
+    workspace_id: UUID
+    question: str = Field(min_length=1, max_length=4000)
 
 
 class SourceRead(BaseModel):
-    document_id: int
+    document_id: UUID
     title: str
-    chunk_index: int
+    page_number: int | None
     score: float
     excerpt: str
 
@@ -34,19 +37,23 @@ def chat(
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> ChatResponse:
-    question = body.message.strip()
+    question = body.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="La pregunta está vacía")
 
-    chunks = search_chunks(session, user.id, question, body.top_k)
-    answer = answer_from_chunks(question, chunks)
+    workspace = session.get(Workspace, body.workspace_id)
+    if workspace is None or workspace.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Workspace no encontrado")
+
+    chunks = search_chunks(session, body.workspace_id, question)
+    answer = generate_answer(question, chunks)
     return ChatResponse(
         answer=answer,
         sources=[
             SourceRead(
                 document_id=chunk.document_id,
                 title=chunk.title,
-                chunk_index=chunk.chunk_index,
+                page_number=chunk.page_number,
                 score=round(chunk.score, 4),
                 excerpt=chunk.content[:280],
             )

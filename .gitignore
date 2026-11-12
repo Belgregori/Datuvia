@@ -1,4 +1,6 @@
 .env
+backend/uploads/
+uploads/
 __pycache__/
 *.py[cod]
 .pytest_cache/
