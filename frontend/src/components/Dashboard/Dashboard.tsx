@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'workspaces' | 'docs' | 'chat'>('workspaces');
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -59,17 +60,44 @@ export default function Dashboard() {
     return <div className="auth-screen"><p className="loading">Cargando sesión...</p></div>;
   }
 
+  const openTab = (tab: 'workspaces' | 'docs' | 'chat') => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <header className="mobile-bar">
+        <button
+          type="button"
+          className="menu-toggle"
+          aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isMobileMenuOpen}
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+        >
+          <span className="menu-toggle-bar" />
+          <span className="menu-toggle-bar" />
+          <span className="menu-toggle-bar" />
+        </button>
         <div className="brand">Datu<span>via</span></div>
+      </header>
+      {isMobileMenuOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Cerrar menú"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      <aside className={isMobileMenuOpen ? 'sidebar open' : 'sidebar'}>
+        <div className="brand sidebar-brand">Datu<span>via</span></div>
         <nav className="nav">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               className={activeTab === tab.id ? 'nav-btn active' : 'nav-btn'}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => openTab(tab.id)}
             >
               {tab.label}
             </button>

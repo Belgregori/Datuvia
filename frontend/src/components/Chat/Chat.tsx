@@ -25,6 +25,83 @@ interface ChatProps {
   selectedWorkspace: Workspace | null;
 }
 
+function plainMath(raw: string): string {
+  return raw
+    .replace(/\\bar\{([^}]+)\}/g, '$1')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\[a-zA-Z]+/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inlineParts(text: string) {
+  const cleaned = text.replace(/\$\$?([^$]+)\$\$?/g, (_, inner: string) => plainMath(inner));
+  const nodes: React.ReactNode[] = [];
+  const pattern = /\*\*(.+?)\*\*/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = pattern.exec(cleaned)) !== null) {
+    if (match.index > last) nodes.push(cleaned.slice(last, match.index));
+    nodes.push(<strong key={key}>{match[1]}</strong>);
+    key += 1;
+    last = match.index + match[0].length;
+  }
+  if (last < cleaned.length) nodes.push(cleaned.slice(last));
+  return nodes;
+}
+
+function AnswerText({ content }: { content: string }) {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const blocks: React.ReactNode[] = [];
+  let list: string[] = [];
+  let paragraph: string[] = [];
+
+  const flushList = () => {
+    if (list.length === 0) return;
+    const items = list;
+    list = [];
+    blocks.push(
+      <ul key={`list-${blocks.length}`} className="answer-list">
+        {items.map((item, index) => (
+          <li key={index}>{inlineParts(item)}</li>
+        ))}
+      </ul>,
+    );
+  };
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    const text = paragraph.join(' ');
+    paragraph = [];
+    blocks.push(<p key={`p-${blocks.length}`}>{inlineParts(text)}</p>);
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      flushList();
+      flushParagraph();
+      continue;
+    }
+    const bullet = line.match(/^[-*•]\s+(.*)$/);
+    if (bullet) {
+      flushParagraph();
+      list.push(bullet[1]);
+      continue;
+    }
+    flushList();
+    paragraph.push(line.replace(/^#+\s+/, ''));
+  }
+  flushList();
+  flushParagraph();
+
+  return <div className="answer">{blocks}</div>;
+}
+
 export default function Chat({ selectedWorkspace }: ChatProps) {
   const [sessions, setSessions] = useState<ChatSessionItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -32,6 +109,7 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const activeSessionRef = useRef<string | null>(null);
 
@@ -180,7 +258,15 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
 
   return (
     <div className="chat-shell">
-      <aside className="session-panel">
+      {isSessionsOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Cerrar conversaciones"
+          onClick={() => setIsSessionsOpen(false)}
+        />
+      )}
+      <aside className={isSessionsOpen ? 'session-panel open' : 'session-panel'}>
         <button
           type="button"
           className="btn btn-primary"
@@ -188,6 +274,7 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
             setActiveSessionId(null);
             setMessages([]);
             setError('');
+            setIsSessionsOpen(false);
           }}
         >
           Nueva conversación
@@ -204,6 +291,7 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
                 onClick={() => {
                   setActiveSessionId(item.id);
                   setError('');
+                  setIsSessionsOpen(false);
                   loadMessages(item.id);
                 }}
               >
@@ -215,9 +303,18 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
       </aside>
 
       <section className="chat">
-        <header className="page-head">
-          <h2>Chat en “{selectedWorkspace.name}”</h2>
-          <p className="muted">Las respuestas usan el historial de esta conversación.</p>
+        <header className="page-head chat-head">
+          <div>
+            <h2>Chat en “{selectedWorkspace.name}”</h2>
+            <p className="muted">Las respuestas usan el historial de esta conversación.</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost sessions-toggle"
+            onClick={() => setIsSessionsOpen(true)}
+          >
+            Conversaciones
+          </button>
         </header>
 
         <div className="chat-thread">
@@ -230,7 +327,7 @@ export default function Chat({ selectedWorkspace }: ChatProps) {
               className={message.role === 'user' ? 'bubble bubble-user' : 'bubble bubble-assistant'}
             >
               <div className="bubble-label">{message.role === 'user' ? 'Vos' : 'Asistente'}</div>
-              <div>{message.content}</div>
+              {message.role === 'assistant' ? <AnswerText content={message.content} /> : <div className="user-text">{message.content}</div>}
               {message.sources && message.sources.length > 0 && (
                 <div className="pills">
                   {message.sources.map((source, sourceIndex) => (

@@ -22,7 +22,7 @@ services:
     container_name: knowledge-hub-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@db:5432/knowledge_hub
+      DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
       JWT_EXPIRE_MINUTES: 30
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

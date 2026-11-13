@@ -7,9 +7,13 @@ from app.core.config import settings
 from app.services.retrieval import RetrievedChunk
 
 _SYSTEM_PROMPT = (
-    "Respondé en español. Usá solamente los fragmentos de los documentos proporcionados. "
-    "Si la respuesta no está en esos fragmentos, decí claramente que la información no está en los documentos. "
-    "Mencioná el título del documento cuando cites un dato."
+    "Respondé en español, solamente con los fragmentos proporcionados. "
+    "Si la respuesta no está ahí, decilo en una frase clara. "
+    "Escribí como una persona que resume para otra: primero una o dos oraciones que contestan la pregunta, "
+    "después un párrafo corto por cada idea. "
+    "No uses Markdown, asteriscos, viñetas, numeración ni negritas. "
+    "No uses LaTeX ni signos $. Si hay una fórmula, explicala con palabras. "
+    "Cerrá cada dato con la cita entre paréntesis: (Título del documento, p. N)."
 )
 
 
