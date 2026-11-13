@@ -31,6 +31,11 @@ jobs:
           python-version: "3.12"
       - name: Instalar dependencias
         run: pip install -r requirements.txt
+      - name: Aplicar migraciones
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/knowledge_hub
+          SECRET_KEY: ci-secret
+        run: alembic upgrade head
       - name: Ejecutar pytest
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/knowledge_hub

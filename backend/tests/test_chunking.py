@@ -10,3 +10,16 @@ def test_chunk_text_splits_with_overlap():
 
 def test_chunk_text_empty():
     assert chunk_text("   \n") == []
+
+
+def test_chunk_text_keeps_words_whole_and_within_size():
+    words = ["alfa", "bravo", "charlie", "delta", "eco", "foxtrot"]
+    text = " ".join(words * 8)
+    size = 18
+    chunks = chunk_text(text, size=size, overlap=4)
+
+    assert chunks
+    for chunk in chunks:
+        assert len(chunk) <= size
+        for token in chunk.split():
+            assert token in words
