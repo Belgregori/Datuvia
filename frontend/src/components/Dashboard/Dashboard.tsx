@@ -8,6 +8,12 @@ interface UserData {
   email: string;
 }
 
+const TABS = [
+  { id: 'workspaces', label: 'Workspaces' },
+  { id: 'docs', label: 'Documentos' },
+  { id: 'chat', label: 'Chat IA' },
+] as const;
+
 export default function Dashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<'workspaces' | 'docs' | 'chat'>('workspaces');
@@ -50,59 +56,52 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <div style={{ padding: '20px' }}>Cargando sesión...</div>;
+    return <div className="auth-screen"><p className="loading">Cargando sesión...</p></div>;
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '20px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Datuvia</h1>
-          {user && <small style={{ color: '#888' }}>Sesión iniciada como: {user.email}</small>}
-          {selectedWorkspace && (
-            <div style={{ fontSize: '0.85rem', color: '#646cff', marginTop: '4px' }}>
-              Workspace activo: <strong>{selectedWorkspace.name}</strong>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">Datu<span>via</span></div>
+        <nav className="nav">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-foot">
+          <div className="workspace-pill">
+            <div className="faint">Workspace activo</div>
+            <strong>{selectedWorkspace ? selectedWorkspace.name : 'Ninguno'}</strong>
+          </div>
+          {user && (
+            <div className="user-chip">
+              <div className="faint">Sesión</div>
+              <div>{user.email}</div>
             </div>
           )}
+          <button type="button" className="btn btn-ghost" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
         </div>
-        <button onClick={handleLogout} style={{ padding: '8px 14px', cursor: 'pointer' }}>
-          Cerrar sesión
-        </button>
-      </header>
+      </aside>
 
-      <nav style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button
-          onClick={() => setActiveTab('workspaces')}
-          style={{ fontWeight: activeTab === 'workspaces' ? 'bold' : 'normal' }}
-        >
-          Workspaces
-        </button>
-        <button
-          onClick={() => setActiveTab('docs')}
-          style={{ fontWeight: activeTab === 'docs' ? 'bold' : 'normal' }}
-        >
-          Documentos
-        </button>
-        <button
-          onClick={() => setActiveTab('chat')}
-          style={{ fontWeight: activeTab === 'chat' ? 'bold' : 'normal' }}
-        >
-          Chat IA
-        </button>
-      </nav>
-
-      <main style={{ padding: '20px', border: '1px solid #333', borderRadius: '8px' }}>
+      <main className="content">
         {activeTab === 'workspaces' && (
           <Workspaces
             selectedWorkspace={selectedWorkspace}
             onSelectWorkspace={setSelectedWorkspace}
           />
         )}
-
         {activeTab === 'docs' && (
           <Documents selectedWorkspace={selectedWorkspace} />
         )}
-
         {activeTab === 'chat' && (
           <Chat selectedWorkspace={selectedWorkspace} />
         )}

@@ -27,6 +27,7 @@ class Workspace(Base):
 
     owner = relationship("User", back_populates="workspaces")
     documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="workspace", cascade="all, delete-orphan")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -36,6 +37,7 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     file_type = Column(String, nullable=False)
     workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False)
+    status = Column(String, nullable=False, default="procesando")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     workspace = relationship("Workspace", back_populates="documents")
@@ -51,3 +53,35 @@ class DocumentChunk(Base):
     embedding = Column(Vector(1536), nullable=True)  # 1536 dimensiones para embeddings de OpenAI / compatibles
 
     document = relationship("Document", back_populates="chunks")
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False, index=True)
+    title = Column(String, nullable=False, default="Nueva conversación")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    workspace = relationship("Workspace", back_populates="chat_sessions")
+    messages = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("chat_sessions.id"), nullable=False, index=True)
+    role = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    tokens_used = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("ChatSession", back_populates="messages")

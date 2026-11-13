@@ -26,6 +26,19 @@ def init_db():
 
     with engine.begin() as connection:
         connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=engine)        
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "ALTER TABLE documents ADD COLUMN IF NOT EXISTS status VARCHAR"
+        ))
+        connection.execute(text(
+            "UPDATE documents SET status = 'listo' WHERE status IS NULL"
+        ))
+        connection.execute(text(
+            "ALTER TABLE documents ALTER COLUMN status SET DEFAULT 'procesando'"
+        ))
+        connection.execute(text(
+            "ALTER TABLE documents ALTER COLUMN status SET NOT NULL"
+        ))        
 
   

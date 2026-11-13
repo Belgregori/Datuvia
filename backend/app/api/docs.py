@@ -1,7 +1,8 @@
 import os
 from io import BytesIO
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
@@ -9,13 +10,13 @@ from sqlmodel import Session, select
 
 from app.core.security import get_current_user
 from app.db.models import Document, DocumentChunk, User, Workspace
-from app.db.session import get_session
+from app.db.session import engine, get_session
 from app.services.chunking import chunk_text
 from app.services.embeddings import embed_texts
 
 router = APIRouter(prefix="/docs", tags=["docs"])
 
-MAX_BYTES = 2_000_000
+MAX_BYTES = 20_000_000
 ALLOWED_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".pdf"}
 UPLOAD_DIR = "uploads"
 
@@ -25,6 +26,7 @@ class DocumentRead(BaseModel):
     title: str
     file_type: str
     chunk_count: int
+    status: str
 
 
 def _extension(filename: str) -> str:
@@ -32,20 +34,62 @@ def _extension(filename: str) -> str:
     return filename[dot:].lower() if dot >= 0 else ""
 
 
-def _pdf_chunks(raw: bytes) -> list[tuple[str, int]]:
-    try:
-        reader = PdfReader(BytesIO(raw))
-    except PdfReadError as exc:
-        raise HTTPException(status_code=400, detail="El PDF no contiene texto extraíble") from exc
+def _extract_pieces(raw: bytes, ext: str) -> list[tuple[str, int]]:
+    if ext == ".pdf":
+        try:
+            reader = PdfReader(BytesIO(raw))
+        except PdfReadError as exc:
+            raise ValueError("El PDF no contiene texto extraíble") from exc
 
-    pieces: list[tuple[str, int]] = []
-    for page_number, page in enumerate(reader.pages, start=1):
-        text = page.extract_text() or ""
-        for piece in chunk_text(text):
-            pieces.append((piece, page_number))
-    if not pieces:
-        raise HTTPException(status_code=400, detail="El PDF no contiene texto extraíble")
-    return pieces
+        pieces: list[tuple[str, int]] = []
+        for page_number, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            for piece in chunk_text(text):
+                pieces.append((piece, page_number))
+        if not pieces:
+            raise ValueError("El PDF no contiene texto extraíble")
+        return pieces
+
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("El archivo tiene que estar en UTF-8") from exc
+
+    text_pieces = chunk_text(content)
+    if not text_pieces:
+        raise ValueError("El archivo no tiene texto para indexar")
+    return [(piece, index + 1) for index, piece in enumerate(text_pieces)]
+
+
+def process_document(document_id: UUID) -> None:
+    with Session(engine) as session:
+        document = session.get(Document, document_id)
+        if document is None:
+            return
+        try:
+            with open(document.file_path, "rb") as handle:
+                raw = handle.read()
+            pieces = _extract_pieces(raw, document.file_type)
+            vectors = embed_texts([piece for piece, _page in pieces])
+            for (piece, page_number), vector in zip(pieces, vectors, strict=True):
+                session.add(
+                    DocumentChunk(
+                        document_id=document.id,
+                        content=piece,
+                        page_number=page_number,
+                        embedding=vector,
+                    )
+                )
+            document.status = "listo"
+            session.add(document)
+            session.commit()
+        except Exception:
+            session.rollback()
+            failed = session.get(Document, document_id)
+            if failed is not None:
+                failed.status = "error"
+                session.add(failed)
+                session.commit()
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -75,6 +119,7 @@ def list_documents(
                 title=document.title,
                 file_type=document.file_type,
                 chunk_count=len(chunks),
+                status=document.status or "listo",
             )
         )
     return result
@@ -82,6 +127,7 @@ def list_documents(
 
 @router.post("", response_model=DocumentRead, status_code=201)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     workspace_id: UUID = Form(...),
     title: str | None = Form(default=None),
@@ -104,58 +150,32 @@ async def upload_document(
     if not raw:
         raise HTTPException(status_code=400, detail="El archivo está vacío")
     if len(raw) > MAX_BYTES:
-        raise HTTPException(status_code=400, detail="El archivo supera los 2 MB")
-
-    if ext == ".pdf":
-        pieces = _pdf_chunks(raw)
-    else:
-        try:
-            content = raw.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise HTTPException(
-                status_code=400, detail="El archivo tiene que estar en UTF-8"
-            ) from exc
-
-        text_pieces = chunk_text(content)
-        if not text_pieces:
-            raise HTTPException(
-                status_code=400, detail="El archivo no tiene texto para indexar"
-            )
-        pieces = [(piece, index + 1) for index, piece in enumerate(text_pieces)]
+        raise HTTPException(status_code=400, detail="El archivo supera los 20 MB")
 
     workspace_folder = os.path.join(UPLOAD_DIR, str(workspace_id))
     os.makedirs(workspace_folder, exist_ok=True)
     file_path = os.path.join(workspace_folder, filename)
-    with open(file_path, "wb") as f:
-        f.write(raw)
+    with open(file_path, "wb") as handle:
+        handle.write(raw)
 
     document = Document(
         title=(title or filename).strip() or filename,
         file_path=file_path,
         file_type=ext,
         workspace_id=workspace_id,
+        status="procesando",
     )
     session.add(document)
-    session.flush()
-
-    vectors = embed_texts([piece for piece, _page in pieces])
-    for (piece, page_number), vector in zip(pieces, vectors, strict=True):
-        session.add(
-            DocumentChunk(
-                document_id=document.id,
-                content=piece,
-                page_number=page_number,
-                embedding=vector,
-            )
-        )
     session.commit()
     session.refresh(document)
+    background_tasks.add_task(process_document, document.id)
 
     return DocumentRead(
         id=document.id,
         title=document.title,
         file_type=document.file_type,
-        chunk_count=len(pieces),
+        chunk_count=0,
+        status=document.status,
     )
 
 

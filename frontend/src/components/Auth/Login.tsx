@@ -3,54 +3,61 @@ import { useState } from 'react';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
       const formData = new URLSearchParams();
-      formData.append('username', email); 
+      formData.append('username', email);
       formData.append('password', password);
 
       const response = await fetch('http://localhost:8000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData
+        body: formData,
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem('token', data.access_token);
-        alert('¡Login exitoso! Token guardado.');
         window.location.href = '/';
       } else {
-        alert('Error en las credenciales');
+        setError('Email o contraseña incorrectos');
       }
-    } catch (error) {
-      console.error('Error de conexión:', error);
-      alert('Error de conexión con el servidor');
+    } catch (err) {
+      console.error('Error de conexión:', err);
+      setError('Error de conexión con el servidor');
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '300px', margin: 'auto' }}>
-      <h2>Iniciar Sesión</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <input 
-          type="email" 
-          placeholder="Email" 
-          value={email} 
-          onChange={(e) => setEmail(e.target.value)} 
-          required 
+    <form className="stack" onSubmit={handleSubmit}>
+      <label className="field">
+        <span>Email</span>
+        <input
+          className="input"
+          type="email"
+          placeholder="vos@empresa.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
         />
-        <input 
-          type="password" 
-          placeholder="Contraseña" 
-          value={password} 
-          onChange={(e) => setPassword(e.target.value)} 
-          required 
+      </label>
+      <label className="field">
+        <span>Contraseña</span>
+        <input
+          className="input"
+          type="password"
+          placeholder="Tu contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
         />
-        <button type="submit">Ingresar</button>
-      </form>
-    </div>
+      </label>
+      {error && <div className="error">{error}</div>}
+      <button className="btn btn-primary" type="submit">Ingresar</button>
+    </form>
   );
 }
