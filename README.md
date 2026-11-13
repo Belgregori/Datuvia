@@ -84,3 +84,17 @@ Para correr los tests de la API:
 ```bash
 docker compose exec api pytest
 ```
+
+
+
+
+<img width="1600" height="749" alt="image" src="https://github.com/user-attachments/assets/5a001f50-ca35-40ee-849c-e1f39341226e" />
+<img width="1600" height="758" alt="image" src="https://github.com/user-attachments/assets/3a5ce18b-9667-46d0-83b4-42f7bb358307" />
+<img width="1600" height="759" alt="image" src="https://github.com/user-attachments/assets/8737c3eb-cd33-41b9-a9c5-12ae1231638c" />
+
+
+
+https://github.com/user-attachments/assets/3e489700-5f97-4c0a-bd27-13bc4f1e644e
+
+
+
